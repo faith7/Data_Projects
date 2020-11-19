@@ -33,6 +33,9 @@ class Customer():
                         cust_details=self.contactdetails))
 
 
+# Create Account class that inherits from bank class and
+# creates methods that return account information, request deposits/withdraw
+# and return the current balance of the account
 class Account(Bank):
     ''' Initialize the account information with account id,
     customer object ,and the inital account balance.'''
@@ -53,10 +56,10 @@ class Account(Bank):
                       cust_name=self.cust.custname, cust_bal=self.balance,
                       bank_name=self.bank_name))
 
-    # If the customer tries to deposit second banks' chcek return instruciton.
+    # If the customer tries to deposit other bank(second bank)'s chcek return instruciton.
     # Otherwise, increase the account balance
     def deposit(self, amount, tf):
-        if (tf.title()) == 'False' or (tf.title()) != 'true':
+        if (tf.lower()) == 't':
             print("We cannot accept Second bank's check(s) on this machine.\
                    \nPlease use our mobile service")
         else:
@@ -81,6 +84,7 @@ class Account(Bank):
             format(bal=self.balance)
 
 
+# Create SavingsAccount class that inherits from Account class
 class SavingsAccount(Account):
     ''' Initialize the savings account information with account id,
     customer object, and the inital account opening balance.'''
