@@ -13,9 +13,9 @@ The program accepts input from the end user to create respective class objects a
 
 &nbsp;
 ## Run the Program 
-#### 1. Git clone to download required programs. 
+#### 1. Git clone to download the program files. 
 ``` sh
-$ git clone https://github.com/udacity/fullstack-nanodegree-vm
+$ git clone https://github.com/faith7/Post_Graduate_Program_Data/tree/master/Python%20Refresher
 ```
 
 
