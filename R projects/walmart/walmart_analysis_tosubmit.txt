@@ -1,0 +1,315 @@
+
+# install dplyr and lubridate package 
+install.packages('dplyr')
+install.packages("lubridate")
+
+# Check if the packages are installed correctly 
+search()
+
+# Load libraries to use on local drive
+library(dplyr)
+library(lubridate)
+
+# read the walmart store data and check its structure
+walmart <- read.csv('c:/00Simply/R_project/walmart/Walmart_Store_sales.csv')
+str(walmart)
+
+# check few data sets 
+head(walmart)
+
+########################
+# Analysis of the data #
+########################
+
+######################################
+# 1. Which store has maximum sales?
+###################################### 
+# Mean of weekly sales by store 
+walmart.m <- walmart %>% group_by(Store) %>% summarise(mean = mean(Weekly_Sales)) 
+# Sort data by descending order
+walmart.m <- arrange(walmart.m, desc(mean))
+walmart.m
+# Ans => Store 20  has the maximum sales 
+
+#############################################################################
+# 2-1. Which store has maximum standard deviation i.e., the sales vary a lot.
+############################################################################# 
+# Standard deviation of weekly sales by store 
+walmart.s <- walmart %>% group_by(Store) %>% summarise(sd=sd(Weekly_Sales))
+# Sort data by descending order
+walmart.s <- arrange(walmart.s, desc(sd))
+walmart.s 
+# Ans => maximum standard deviation : store 14 
+
+######################################################################
+# 2-2. Also, find out the coefficient of mean to standard deviation.
+######################################################################
+# Standard deviation of weekly sales 
+walmart.st <- summarise(walmart, sd=sd(Weekly_Sales))
+walmart.st
+# Mean of weekly sales 
+walmart.mm <- summarise(walmart, mean=mean(Weekly_Sales))
+walmart.mm
+#Coefficient of mean to standard deviation 
+walmart.cv <- (walmart.st/walmart.mm)
+walmart.cv
+# Ans => coefficient of mean to standard deviation :  0.5390502
+
+###############################################################
+#3.Which store/s has good quarterly growth rate in Q3'2012?
+###############################################################
+# Mutate the column data into dmy format 
+walmart %>% mutate(walmart$Date, d = dmy(walmart$Date)) -> walmart
+
+# Filter 2nd and 3rd Quarter data from walmart data 
+walmart %>% filter(walmart$d >= as.Date("2012-04-01") & walmart$d <= as.Date("2012-09-30") ) ->walmart
+head(walmart)
+
+# Mutate the colum data into quarter format 
+walmart %>% mutate(d, q = quarter(walmart$d)) -> walmart
+head(walmart)
+
+# Subset quarter 2 / quarter 3 data
+qrt2_sales <- subset(walmart, q==2 )
+qrt3_sales <- subset(walmart, q==3)
+
+# Sum quarter 2 and quarter 3 sales by store group  
+qrt2_sales %>% group_by(Store) %>% summarise(Weekly_Sales = sum(Weekly_Sales)) ->q2
+qrt3_sales %>% group_by(Store) %>% summarise(Weekly_Sales = sum(Weekly_Sales)) ->q3
+head(q2)
+head(q3)
+
+# Combine quarter 2 and quartr 3 data and calculate growth rate percentage 
+qrt_diff <- cbind(q2, q3, growth_rate_pct=(q3$Weekly_Sales - q2$Weekly_Sales)*100/(q2$Weekly_Sales))
+head(qrt_diff)
+
+# Sort quarterly difference data by growth rate and show top 10 data
+head(qrt_diff[order(-qrt_diff$growth_rate_pct),], 10)
+
+# Ans => Store 7 and 16 had good growth rate during Q3 compared to Q2 of 2012, 
+# assumming that the growth rate 5 % and over is considered as a good growth.
+
+##############################################################################################################
+# 4. Some holidays have a negative impact on sales. 
+# Find out holidays which have higher sales than the mean sales in non-holiday season for all stores together
+# Holiday Events
+# Super Bowl: 12-Feb-10, 11-Feb-11, 10-Feb-12, 8-Feb-13
+# Labour Day: 10-Sep-10, 9-Sep-11, 7-Sep-12, 6-Sep-13
+# Thanksgiving: 26-Nov-10, 25-Nov-11, 23-Nov-12, 29-Nov-13
+# Christmas: 31-Dec-10, 30-Dec-11, 28-Dec-12, 27-Dec-13
+#############################################################################################################
+
+# Reread the walmart data to avoid varialbe name confusion 
+walmart <- read.csv('c:/00Simply/R_project/walmart/Walmart_Store_sales.csv')
+
+# Check the data structure
+head(walmart)
+str(walmart)
+
+# Filter non holiday data
+walmart %>% filter(walmart$Holiday_Flag == 0) -> walmart_nonh
+
+# Check 10 non holiday data that is filtered
+head(walmart_nonh,10)
+
+# Calculate the mean of non holiday weekly sales
+walmart_nonh %>% summarise(mean=mean(Weekly_Sales)) ->mean_non_holidays
+mean_non_holidays 
+
+# Create the function to categorize the data by its specific holiday
+hol_cat <- function(d){
+if(d == ymd("2010-02-12") | d == ymd("2011-02-11") | d == ymd("2012-02-10") | d == ymd("2013-02-08")) {
+  return ("Super_bowl")
+} else if(d == ymd("2010-09-10")| d == ymd("2011-09-09") | d == ymd("2012- 09-07")| d == ymd("2013-09-06")) {
+  return ("Labor_day")
+} else if(d == ymd("2010-11-26") | d== ymd("2011-11-25") | d == ymd("2012-11-23") | d == ymd("2013-11-29")) {
+  return ("Thanksgiving")
+} else {
+  return ("Christmas")
+}
+}
+
+# Filter only holiday data
+walmart %>% filter(walmart$Holiday_Flag == 1) ->walmart_h 
+
+# Mutate holiday filtered data and create d column in date month year format
+walmart_h %>% mutate(walmart_h$Date, d = dmy(walmart_h$Date)) -> walmart_hd
+head(walmart_hd)
+
+# Apply hol_cat function to categorize data by holiday using d column 
+hol <-mapply(hol_cat, ymd(walmart_hd$d))
+
+# Attach holiday category column to the date month year formated holiday data
+walmart_hd <- cbind(walmart_hd,hol)
+
+# Check if the holiday column is correctly attached 
+head(walmart_hd, 10)
+
+# Sum weekly sales by holiday
+agg_hol <- aggregate(walmart_hd$Weekly_Sales, list(walmart_hd$hol), FUN = mean)
+head(agg_hol)
+
+# Check dimmension names and replace them with Holiday_Cat and Weekly_Sales_Sum
+dimnames(agg_hol)
+colnames(agg_hol) <- c("Holiday_Cat", "Weekly_Sales_Sum")
+agg_hol
+
+# Mutate data to add additional column (mean_non_holidays) to compare weekly sales sum  with mean of non holiday sales 
+agg_hol %>% mutate(agg_hol, mean_non_holidays) ->agg_hols
+agg_hols
+
+agg_hols <- as.data.frame(agg_hols)
+str(agg_hols)
+
+# Calculate the difference btw non holiday mean and holiday sale mean and name the column as diff
+agg_holss <- agg_hols %>% mutate(diff = agg_hols$Weekly_Sales_Sum - agg_hols$mean)
+
+# Change the column name from mean to non_holiday_mean for clarification 
+names(agg_holss)[3] ="non_holiday_mean"
+agg_holss
+
+# Ans: Labor_day, Super bowl and Thanksgiving has have higher sales 
+# than the mean sales in non-holiday season for all stores together.
+
+#############################################################################
+# 5. Provide a monthly and semester view of sales in units 
+#    and give insights
+#############################################################################
+# Install ggplot2 for graphic representation and load it into the system
+install.packages("ggplot2")
+library(ggplot2)
+
+# Reread the walmart data to avoid variable confucion for this question
+walmart <- read.csv('c:/00Simply/R_project/walmart/Walmart_Store_sales.csv')
+head(walmart)
+
+# Mutate the walmart data to change Date into dmy format
+walmart %>% mutate(walmart$Date, d = dmy(walmart$Date)) -> walmart_y
+
+# Calculate the mean by weekly sale by month  
+agg_m<-aggregate(walmart_y$Weekly_Sales, list(month(walmart_y$d)), FUN = mean)
+agg_m
+
+# Change the column names in agg_m to month and sales
+names(agg_m)[1]="Month"
+names(agg_m)[2]="Sales"
+agg_m
+
+# Plot the histogram to see the monthly view of sales data
+ggplot(agg_m, aes(x=Month, y = Sales)) +geom_histogram(stat = "identity", color="black", fill="dark blue", binwidth=3)
+
+# Calculate the mean by the semester 
+agg_s<-aggregate(walmart_y$Weekly_Sales, list(semester(walmart_y$d)), FUN = mean)
+agg_s
+
+# Change column name to Semester and  Sales
+names(agg_s)[1]="Semester"
+names(agg_s)[2]="Sales"
+
+# Create a pie chart to see the semester view
+slices <-c(1024916, 1069324)
+lbls <-c("early half year", "later half year")
+pie( slices, labels = lbls, main="Semester Sales View")
+
+# Create a histogram to see the semester view
+ggplot(agg_s, aes(x=Semester, y = Sales)) +geom_histogram(stat = "identity", color="black", fill="dark blue")
+
+
+# Ans on Monthyly view => The last months (December and November) show the highest sales compared to other months, 
+# with December sales rank the highest. There is not much variation on other month with January showing 
+# the lowest monthly sales. 
+
+# Ans on Semester view =>  There is not much difference between first half and second half sales.  
+# The later half semester shows slightly better weekly sales compared to the early 6 months sales.
+ 
+
+########################
+#  Statistical Model
+########################
+# For Store 1 - Build  prediction models to forecast demand
+# 
+# - Linear Regression - Utilize variables like date and restructure dates as 1 for 5 Feb 2010 
+#    (starting from the earliest date in order). 
+#    Hypothesize if CPI, unemployment, and fuel price have any impact on sales.
+#  - Change dates into days by creating new variable.
+# 
+# Select the model which gives best accuracy.
+############################################################
+
+# Reread the walmart file to clarify variable name confusion 
+walmart <- read.csv('c:/00Simply/R_project/walmart/Walmart_Store_sales.csv')
+head(walmart)
+# Filter only store 1 data
+walmart %>% filter(Store == 1) -> store1
+head(store1,5)
+
+# Mutate date into dmy format and then convert it to weekday data
+walmart %>% mutate(walmart$Date, d = dmy(walmart$Date)) -> walmart
+walmart %>% mutate(walmart$d, day = weekdays(walmart$d)) -> walmart
+head(walmart)
+
+# To check numeric value of Feb 5th 2010 for number sequences 
+as.numeric(walmart$d[1]) 
+# 14644 should be subtracted to assign #1 to the feb 5, 2010 
+
+# Create a function to make Feb 5th 2010 as number: 1
+f1 <- function(d){
+  return (as.numeric(as.Date(d))-14644)
+}
+
+# Apply the function to create number sequence
+dd<- mapply(f1, walmart$d)
+head(dd)
+
+# Combine the number sequence column to the exisiting data
+walmart<- cbind(walmart,dd)
+head(walmart)
+
+#To remove the orignal date column 
+walmart<-walmart[-2]
+head(walmart)
+
+#To remove the walmart$Date column
+walmart <- walmart[-8]
+head(walmart)
+#To remove the walmart$d column
+walmart <- walmart[-9]
+
+#To remove d column
+walmart <- walmart[-8]
+head(walmart)
+
+# Check linear model to see the relationship 
+# between weekly sales(dependent variable) and independent variables - CPI, unemployment and fuel price
+wal1 <-  lm(Weekly_Sales ~ CPI + Unemployment + Fuel_Price, walmart)
+summary(wal1) 
+# p-value of fuel price is bigger than the significance level. 
+# It might be better to remove the fuel price in the model for better predictability 
+
+
+# Check linear model to see the relationship 
+# between weekly sales(dependent variable) and independent variables - CPI, unemployment 
+wal2 <-  lm(Weekly_Sales ~ CPI + Unemployment, walmart)
+summary(wal2)
+# The p value of both CPI and unemployoment is small compared to signficance level. 
+# Ajusted r -squared is 0.02303 
+
+wal3 <-  lm(Weekly_Sales ~ CPI, walmart)
+summary(wal3)
+# Ajusted r -squred is 0.005121 
+
+wal4 <-  lm(Weekly_Sales ~ Unemployment, walmart)
+summary(wal4)
+# Adjusted r -squared is 0.01112 
+
+# Both independent variables (CPI & Unemployment) should be included in the model 
+# reflecting the better adjusted r-squared score compared to the adjusted r squared with one independent variable respectively
+
+
+#  ANS => wal2 <-  lm(Weekly_Sales ~ CPI + Unemployment, walmart)
+#  Weekly_Sales = 1669687.8 -1652.1 *CPI - 42411.9* Unemployment + Error  
+#  This model would provide the best prediction with lower error level compared to other models shown above, 
+#  considering the adjusted r squared and p values.  Please check the above comments for details.
+#  To interpret the data, weekly sales have inverse relationship with unemployment and CPI. 
+#  The higher unemployment/CPI, the lower weekly sales are predicted, with unemployment has bigger negative impact on weekly sales. 
+ 
